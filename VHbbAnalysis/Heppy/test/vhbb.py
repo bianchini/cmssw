@@ -142,19 +142,20 @@ shifted_mets = {mk: NTupleObject(nm, shiftedMetType, help="PF E_{T}^{miss}, afte
 treeProducer.globalObjects.update(shifted_mets)
 
 btag_weights = {}
-for syst in ["JES", "LF", "HF", "HFStats1", "HFStats2", "LFStats1", "LFStats2", "cErr1", "cErr2"]:
-	for sdir in ["Up", "Down"]:
-		name = "bTagWeight"+syst+sdir
-		btag_weights[name] = NTupleVariable("bTagWeight_" + syst + sdir,
+if add_btag_SF:
+	for syst in ["JES", "LF", "HF", "HFStats1", "HFStats2", "LFStats1", "LFStats2", "cErr1", "cErr2"]:
+		for sdir in ["Up", "Down"]:
+			name = "bTagWeight"+syst+sdir
+			btag_weights[name] = NTupleVariable("bTagWeight_" + syst + sdir,
 			lambda ev, sname=syst+sdir: bweightcalc.calcEventWeight(
 				ev.cleanJetsAll, kind="final", systematic=sname
 			), float, mcOnly=True, help="b-tag CSV weight, variating "+syst+" "+sdir
 		)
-btag_weights["bTagWeight"] = NTupleVariable("bTagWeight",
+	btag_weights["bTagWeight"] = NTupleVariable("bTagWeight",
 	lambda ev: bweightcalc.calcEventWeight(
 		ev.cleanJetsAll, kind="final", systematic="nominal"
 	), float ,mcOnly=True, help="b-tag CSV weight, nominal"
-)
+						    )
 #print list(btag_weights.values())
 treeProducer.globalVariables += list(btag_weights.values())
 

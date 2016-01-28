@@ -6,6 +6,8 @@ import ROOT
 from PhysicsTools.Heppy.analyzers.objects.autophobj import *
 from PhysicsTools.HeppyCore.utils.deltar import deltaPhi
 
+add_btag_SF = False
+add_lep_SF = False
 
 import copy, os
 
@@ -147,64 +149,69 @@ bweightcalc = BTagWeightCalculator(
     csvpath + "/csv_rwt_fit_lf_2015_12_14.root"
 )
 
-for syst in ["JES", "LF", "HF", "HFStats1", "HFStats2", "LFStats1", "LFStats2", "cErr1", "cErr2"]:
-    for sdir in ["Up", "Down"]:
-        jetTypeVHbb.variables += [NTupleVariable("bTagWeight"+syst+sdir,
+if add_btag_SF:
+    for syst in ["JES", "LF", "HF", "HFStats1", "HFStats2", "LFStats1", "LFStats2", "cErr1", "cErr2"]:
+        for sdir in ["Up", "Down"]:
+            jetTypeVHbb.variables += [NTupleVariable("bTagWeight"+syst+sdir,
             lambda jet, sname=syst+sdir,bweightcalc=bweightcalc: bweightcalc.calcJetWeight(
                 jet, kind="final", systematic=sname
             ), float, mcOnly=True, help="b-tag CSV weight, variating "+syst + " "+sdir
         )]
-jetTypeVHbb.variables += [NTupleVariable("bTagWeight",
+
+    jetTypeVHbb.variables += [NTupleVariable("bTagWeight",
     lambda jet, bweightcalc=bweightcalc: bweightcalc.calcJetWeight(
         jet, kind="final", systematic="nominal",
     ), float, mcOnly=True, help="b-tag CSV weight, nominal"
 )]
 
-# add the POG SF
-ROOT.gSystem.Load(csvpath+'/BTagCalibrationStandalone.so')
-calib = ROOT.BTagCalibration("csvv2", csvpath+"/CSVv2.csv")
+    # add the POG SF
+    ROOT.gSystem.Load(csvpath+'/BTagCalibrationStandalone.so')
+    calib = ROOT.BTagCalibration("csvv2", csvpath+"/CSVv2.csv")
 
-for wp in [ [0, "L"],[1, "M"], [2,"T"] ]:
-    for syst in ["central", "up", "down"]:
-        csv_calib_bc = ROOT.BTagCalibrationReader(calib, wp[0], "mujets", syst)
-        csv_calib_l = ROOT.BTagCalibrationReader(calib, wp[0], "comb", syst)
-        jetTypeVHbb.variables += [ NTupleVariable("btagCSV"+wp[1]+"SF_"+syst,  lambda jet, csv_calib_bc=csv_calib_bc, csv_calib_l=csv_calib_l : 
-                                                  (csv_calib_bc.eval( -jet.hadronFlavour()+5 ,jet.eta(), jet.pt()) if (abs(jet.eta())<2.4 and jet.pt()<670. and jet.pt()>30.) else 1.0) 
-                                                  if jet.hadronFlavour()>=4 
-                                                  else (csv_calib_l.eval(2,jet.eta(), jet.pt()) if (abs(jet.eta())<2.4 and jet.pt()<1000. and jet.pt()>20.) else 1.0)
-                                                  , float, mcOnly=True, help="b-tag CSV"+wp[1]+" POG scale factor, "+syst  )]
+    for wp in [ [0, "L"],[1, "M"], [2,"T"] ]:
+        for syst in ["central", "up", "down"]:
+            csv_calib_bc = ROOT.BTagCalibrationReader(calib, wp[0], "mujets", syst)
+            csv_calib_l = ROOT.BTagCalibrationReader(calib, wp[0], "comb", syst)
+            jetTypeVHbb.variables += [ NTupleVariable("btagCSV"+wp[1]+"SF_"+syst,  lambda jet, csv_calib_bc=csv_calib_bc, csv_calib_l=csv_calib_l : 
+                                                      (csv_calib_bc.eval( -jet.hadronFlavour()+5 ,jet.eta(), jet.pt()) if (abs(jet.eta())<2.4 and jet.pt()<670. and jet.pt()>30.) else 1.0) 
+                                                      if jet.hadronFlavour()>=4 
+                                                      else (csv_calib_l.eval(2,jet.eta(), jet.pt()) if (abs(jet.eta())<2.4 and jet.pt()<1000. and jet.pt()>20.) else 1.0)
+                                                      , float, mcOnly=True, help="b-tag CSV"+wp[1]+" POG scale factor, "+syst  )]
             
 
 #add per-lepton SF
 from leptonSF import LeptonSF
 
-jsonpath = os.environ['CMSSW_BASE']+"/src/VHbbAnalysis/Heppy/data/leptonSF/"
-jsons = {    
-    'muSF_HLT' : [ jsonpath+'SingleMuonTrigger_Z_RunCD_Reco74X_Dec1.json' , 'runD_IsoMu20_OR_IsoTkMu20_HLTv4p2_PtEtaBins', 'abseta_pt_ratio' ],
-    'muSF_IsoLoose' : [ jsonpath+'MuonIso_Z_RunCD_Reco74X_Dec1.json' , 'NUM_LooseRelIso_DEN_LooseID_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'],
-    'muSF_IsoTight' : [ jsonpath+'MuonIso_Z_RunCD_Reco74X_Dec1.json' , 'NUM_TightRelIso_DEN_TightID_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'],
-    'muSF_IdLoose' : [ jsonpath+'MuonID_Z_RunCD_Reco74X_Dec1.json' , 'NUM_LooseID_DEN_genTracks_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'] ,
-    'muSF_IdTight' : [ jsonpath+'MuonID_Z_RunCD_Reco74X_Dec1.json' , 'NUM_TightIDandIPCut_DEN_genTracks_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'] ,
-    'eleSF_HLT' : ['','',''],
-    'eleSF_IdLoose' : [jsonpath+'CutBasedID_LooseWP.json', 'CutBasedID_LooseWP', 'eta_pt_ratio'],
-    'eleSF_IdTight' : [jsonpath+'CutBasedID_TightWP.json', 'CutBasedID_TightWP', 'eta_pt_ratio'],
-    'eleSF_IsoLoose' : ['','',''],
-    'eleSF_IsoTight' : ['','',''],
-    }
+if add_lep_SF:
 
-correctors = {}
-for name, conf in jsons.iteritems(): 
-    correctors[name] = LeptonSF(conf[0], conf[1], conf[2])
+    jsonpath = os.environ['CMSSW_BASE']+"/src/VHbbAnalysis/Heppy/data/leptonSF/"
+    jsons = {    
+        'muSF_HLT' : [ jsonpath+'SingleMuonTrigger_Z_RunCD_Reco74X_Dec1.json' , 'runD_IsoMu20_OR_IsoTkMu20_HLTv4p2_PtEtaBins', 'abseta_pt_ratio' ],
+        'muSF_IsoLoose' : [ jsonpath+'MuonIso_Z_RunCD_Reco74X_Dec1.json' , 'NUM_LooseRelIso_DEN_LooseID_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'],
+        'muSF_IsoTight' : [ jsonpath+'MuonIso_Z_RunCD_Reco74X_Dec1.json' , 'NUM_TightRelIso_DEN_TightID_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'],
+        'muSF_IdLoose' : [ jsonpath+'MuonID_Z_RunCD_Reco74X_Dec1.json' , 'NUM_LooseID_DEN_genTracks_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'] ,
+        'muSF_IdTight' : [ jsonpath+'MuonID_Z_RunCD_Reco74X_Dec1.json' , 'NUM_TightIDandIPCut_DEN_genTracks_PAR_pt_spliteta_bin1', 'abseta_pt_ratio'] ,
+        'eleSF_HLT' : ['','',''],
+        'eleSF_IdLoose' : [jsonpath+'CutBasedID_LooseWP.json', 'CutBasedID_LooseWP', 'eta_pt_ratio'],
+        'eleSF_IdTight' : [jsonpath+'CutBasedID_TightWP.json', 'CutBasedID_TightWP', 'eta_pt_ratio'],
+        'eleSF_IsoLoose' : ['','',''],
+        'eleSF_IsoTight' : ['','',''],
+        }
 
-for cut in ["HLT", "IsoLoose", "IsoTight", "IdLoose", "IdTight"]:     
-    leptonTypeVHbb.variables += [NTupleVariable("SF_"+cut, 
-                                                lambda x, muCorr=correctors["muSF_"+cut], eleCorr=correctors["eleSF_"+cut] : muCorr.get_2D(x.pt(), x.eta())[0] if abs(x.pdgId()) == 13 else eleCorr.get_2D(x.pt(), x.eta())[0], 
-                                                float, mcOnly=True, help="SF for lepton "+cut
-                                                )]
-    leptonTypeVHbb.variables += [NTupleVariable("SFerr_"+cut, 
-                                                lambda x, muCorr=correctors["muSF_"+cut], eleCorr=correctors["eleSF_"+cut] : muCorr.get_2D(x.pt(), x.eta())[1] if abs(x.pdgId()) == 13 else eleCorr.get_2D(x.pt(), x.eta())[1], 
-                                                float, mcOnly=True, help="SF error for lepton "+cut
-                                                )]
+    correctors = {}
+    for name, conf in jsons.iteritems(): 
+        correctors[name] = LeptonSF(conf[0], conf[1], conf[2])
+        
+        for cut in ["HLT", "IsoLoose", "IsoTight", "IdLoose", "IdTight"]:     
+            if add_lep_SF:
+                leptonTypeVHbb.variables += [NTupleVariable("SF_"+cut, 
+                                                            lambda x, muCorr=correctors["muSF_"+cut], eleCorr=correctors["eleSF_"+cut] : muCorr.get_2D(x.pt(), x.eta())[0] if abs(x.pdgId()) == 13 else eleCorr.get_2D(x.pt(), x.eta())[0], 
+                                                            float, mcOnly=True, help="SF for lepton "+cut
+                                                            )]
+                leptonTypeVHbb.variables += [NTupleVariable("SFerr_"+cut, 
+                                                            lambda x, muCorr=correctors["muSF_"+cut], eleCorr=correctors["eleSF_"+cut] : muCorr.get_2D(x.pt(), x.eta())[1] if abs(x.pdgId()) == 13 else eleCorr.get_2D(x.pt(), x.eta())[1], 
+                                                            float, mcOnly=True, help="SF error for lepton "+cut
+                                                            )]
 
 
 
